@@ -29,7 +29,7 @@ public:
         if (current == 0) {
             return 0;
         }
-        int result = write(out_fd, buf, current);
+        int result = ::write(out_fd, buf, current);
         if(result < 0) {
             return -1;
         }
@@ -37,14 +37,14 @@ public:
         return 0;
     }
 
-    int append(const char *start, int size) {
+    int write(const char *start, int size) {
         int space_left = N - current;
         if (space_left < size) {
             if (flush() < 0) {
                 return -1;
             }
             if (N < size) {
-                if(write(out_fd, start, size) < 0) {
+                if(::write(out_fd, start, size) < 0) {
                     return -1;
                 }
                 current = 0;
@@ -56,8 +56,8 @@ public:
         return 0;
     }
 
-    inline int append(const Line &line) {
-        return append(line.data(), line.len());
+    inline int write(const Line &line) {
+        return write(line.data(), line.len());
     }
 
     int add(Writer<N> &add) {

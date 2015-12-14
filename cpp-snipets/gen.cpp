@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
                 buf[l] = (random() % 10) + '0';
             }
             buf[len] = sep[k];
-            stdout.append(buf, len + 1);
+            stdout.write(buf, len + 1);
         }
     }
 }

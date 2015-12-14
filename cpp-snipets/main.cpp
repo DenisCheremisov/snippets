@@ -34,14 +34,14 @@ int main(int argc, char *argv[]) {
     while( (res = reader.getline(line)) > 0 ) {
         bool res = matcher.feed(line, rest);
         if (res) {
-            dst.append(column1.chars());
-            dst.append("\t", 1);
-            dst.append(column2.chars());
-            dst.append("\n", 1);
+            dst.write(column1.chars());
+            dst.write("\t", 1);
+            dst.write(column2.chars());
+            dst.write("\n", 1);
         } else {
-            err.append("ERROR: unparsed ", 16);
-            err.append(line);
-            err.append("\n", 1);
+            err.write("ERROR: unparsed ", 16);
+            err.write(line);
+            err.write("\n", 1);
             err.flush();
         }
     }
