@@ -14,8 +14,8 @@ int main(int argc, char *argv[]) {
     Line line;
 
     SearchChar tab('\t');
-    SearchString delim("apropasio");
     End end;
+
     TakeCharsUntil<SearchChar> column1(&tab);
     TakeCharsUntil<SearchChar> column2(&tab);
     PassCharsUntil<SearchChar> pass(&tab);
