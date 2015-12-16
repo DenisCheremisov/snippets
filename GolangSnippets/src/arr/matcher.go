@@ -103,3 +103,17 @@ func (seeker SearchByte) Seek(source []byte) (bool, int, []byte) {
 		return true, pos, source[pos+1:]
 	}
 }
+
+type SearchAnyOf [][]byte
+
+func (seeker SearchAnyOf) Seek(source []byte) (bool, int, []byte) {
+	for _, item := range seeker {
+		pos := bytes.Index(source, item)
+		if pos < 0 {
+			continue
+		} else {
+			return true, pos, source[pos+len(item):]
+		}
+	}
+	return false, 0, source
+}

@@ -40,6 +40,28 @@ func TestMatcher(t *testing.T) {
 	assert.Equal(t, string(take3.Bytes()), "abcdef")
 }
 
+func TestVariant(t *testing.T) {
+	take := TakeBytesUntil(SearchAnyOf([][]byte{
+		[]byte("1234"),
+		[]byte("4321"),
+		[]byte("9999"),
+	}))
+	matcher := NewMatcher(take)
+
+	success, _ := matcher.Feed([]byte("abcdef1234"))
+	assert.True(t, success)
+	assert.Equal(t, "abcdef", string(take.Bytes()))
+
+	success, _ = matcher.Feed([]byte("abcdef22344321"))
+	assert.True(t, success)
+	assert.Equal(t, "abcdef2234", string(take.Bytes()))
+
+	success, rest := matcher.Feed([]byte("abcdef12999934431"))
+	assert.True(t, success)
+	assert.Equal(t, "abcdef12", string(take.Bytes()))
+	assert.Equal(t, string(rest), "34431")
+}
+
 func BenchmarkMatcher(b *testing.B) {
 	line := []byte("1\t2\t3\t4\t5")
 
