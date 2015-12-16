@@ -143,4 +143,34 @@ public:
     }
 };
 
+class SearchVariant {
+    const int len;
+    const char **variants;
+    int *lengths;
+
+public:
+    SearchVariant(int l, const char **v): len(l), variants(v) {
+        lengths = new int[l];
+        for(int i = 0; i < l; i++) {
+            lengths[i] = strlen(v[i]);
+        }
+    }
+    virtual ~SearchVariant() {
+        delete lengths;
+    }
+
+    bool seek(const Line &line, const char *&prepos, const char *&rest) {
+        for(int i = 0; i < len; i++) {
+            const char *item = variants[i];
+            prepos = (char*) memmem(
+                line.data(), line.len(), variants[i], lengths[i]);
+            if (prepos != NULL) {
+                rest = prepos + lengths[i];
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
 #endif // _MATCHER_HPP_INCLUDED_UQ4938204830498304982390_
