@@ -173,4 +173,76 @@ public:
     }
 };
 
+
+class _prefix_struct {
+public:
+    _prefix_struct *table[256];
+    bool final;
+
+    _prefix_struct() {
+        for(int i = 0; i < 256; i++) {
+            table[i] = NULL;
+        }
+        final = false;
+    }
+
+    ~_prefix_struct() {
+        for(auto it: table) {
+            if (it != NULL) {
+                delete it;
+            }
+        }
+    }
+
+    void append(const char *word) {
+        if(word[0] == '\0') {
+            final = true;
+            return;
+        }
+        size_t i = (size_t)word[0];
+
+        if(table[i] == NULL) {
+            table[i] = new _prefix_struct();
+        }
+        table[i]->append(word + 1);
+    }
+
+};
+
+
+class SearchVariant {
+    _prefix_struct prefix;
+
+public:
+    SearchVariant(int l, const char **variants) {
+        for(int i = 0; i < l; i++) {
+            prefix.append(variants[i]);
+        }
+    }
+
+    bool seek(const Line &line, const char *&prepos, const char *&rest) {
+        int len = line.len();
+        prepos = line.data();
+        for(int len = line.len(); len > 0; len--, prepos++) {
+            if(prefix.table[(size_t)prepos[0]] == NULL) {
+                continue;
+            } else {
+                _prefix_struct *next = &prefix;
+                const char *iter = prepos;
+                int rest_len = len;
+                while(next != NULL && rest_len > 0) {
+                    if(next->final) {
+                        rest = iter;
+                        return true;
+                    }
+                    next = next->table[(size_t)iter[0]];
+                    iter++;
+                    rest_len--;
+                }
+            }
+        }
+        return false;
+    }
+};
+
 #endif // _MATCHER_HPP_INCLUDED_UQ4938204830498304982390_
