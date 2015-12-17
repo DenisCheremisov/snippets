@@ -143,27 +143,27 @@ public:
     }
 };
 
-class SearchVariant {
+class SearchAnyOf {
     const int len;
-    const char **variants;
+    const char **anyof;
     int *lengths;
 
 public:
-    SearchVariant(int l, const char **v): len(l), variants(v) {
+    SearchAnyOf(int l, const char **ao): len(l), anyof(ao) {
         lengths = new int[l];
         for(int i = 0; i < l; i++) {
-            lengths[i] = strlen(v[i]);
+            lengths[i] = strlen(ao[i]);
         }
     }
-    virtual ~SearchVariant() {
+    virtual ~SearchAnyOf() {
         delete lengths;
     }
 
     bool seek(const Line &line, const char *&prepos, const char *&rest) {
         for(int i = 0; i < len; i++) {
-            const char *item = variants[i];
+            const char *item = anyof[i];
             prepos = (char*) memmem(
-                line.data(), line.len(), variants[i], lengths[i]);
+                line.data(), line.len(), anyof[i], lengths[i]);
             if (prepos != NULL) {
                 rest = prepos + lengths[i];
                 return true;

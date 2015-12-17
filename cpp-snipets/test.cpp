@@ -10,9 +10,9 @@ int main(int argc, char *argv[]) {
     Line line(content, strlen(content));
     const char *data[] = {"2033", "33", "19"};
 
-    SearchVariant variant(3, data);
+    SearchAnyOf variant(3, data);
 
-    TakeCharsUntil<SearchVariant> take(&variant);
+    TakeCharsUntil<SearchAnyOf> take(&variant);
 
     Matcher matcher;
     matcher << take;
