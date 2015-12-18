@@ -23,13 +23,13 @@ TEST(VariantTests, HandleAnyOf) {
 }
 
 
-TEST(VariantTests, HandleVariants) {
+TEST(VariantTests, HandleClosest) {
     const char *content = "abcdefgh 9999";
     Line line(content, strlen(content));
     const char *data[] = {"1", "2", "99"};
 
-    SearchVariant variant(3, data);
-    TakeCharsUntil<SearchVariant> take(&variant);
+    SearchClosest variant(3, data);
+    TakeCharsUntil<SearchClosest> take(&variant);
 
     Matcher matcher;
     matcher << take;
@@ -43,8 +43,8 @@ TEST(VariantTests, HandleVariants) {
 
     const char *content2 = "abc945a193";
     line = Line(content2, strlen(content2));
-    SearchVariant v2(3, data);
-    TakeCharsUntil<SearchVariant> take2(&v2);
+    SearchClosest v2(3, data);
+    TakeCharsUntil<SearchClosest> take2(&v2);
     Matcher m2;
     m2 << take2;
     res = m2.feed(line, rest);
