@@ -1,4 +1,4 @@
-package dateseq
+package arr
 
 import "bytes"
 
@@ -72,48 +72,36 @@ func (taker *TakeBytes) Bytes() []byte {
 	return taker.val
 }
 
-type Search []byte
+type OnTheEnd bool
 
-func SearchString(val string) Search {
-	return Search([]byte(val))
-}
-
-func (seeker Search) Seek(source []byte) (bool, int, []byte) {
-	pos := bytes.Index(source, seeker)
-	if pos < 0 {
-		return false, 0, source
+func (taker OnTheEnd) Take(source []byte) (bool, []byte) {
+	if bool(taker) {
+		return len(source) == 0, source
 	} else {
-		return true, pos, source[pos+len(seeker):]
+		return len(source) != 0, source
 	}
 }
 
-type EndSeeker bool
+type PassPattern []byte
 
-func (seeker EndSeeker) Seek(source []byte) (bool, int, []byte) {
-	return true, len(source), source[len(source):]
-}
-
-type SearchByte byte
-
-func (seeker SearchByte) Seek(source []byte) (bool, int, []byte) {
-	pos := bytes.IndexByte(source, byte(seeker))
-	if pos < 0 {
-		return false, 0, source
+func (taker PassPattern) Take(source []byte) (bool, []byte) {
+	if len(source) < len(taker) {
+		return false, source
+	}
+	if bytes.Equal(taker, source[:len(taker)]) {
+		return true, source[len(taker):]
 	} else {
-		return true, pos, source[pos+1:]
+		return false, source
 	}
 }
 
-type SearchAnyOf [][]byte
+type PassFuncCheck func(byte) bool
 
-func (seeker SearchAnyOf) Seek(source []byte) (bool, int, []byte) {
-	for _, item := range seeker {
-		pos := bytes.Index(source, item)
-		if pos < 0 {
-			continue
-		} else {
-			return true, pos, source[pos+len(item):]
+func (taker PassFuncCheck) Take(source []byte) (bool, []byte) {
+	if len(source) > 1 {
+		if taker(source[0]) {
+			return true, source[1:]
 		}
 	}
-	return false, 0, source
+	return false, source
 }

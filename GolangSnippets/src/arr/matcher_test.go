@@ -1,7 +1,7 @@
-package dateseq
+package arr
 
 import (
-	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,7 +40,7 @@ func TestMatcher(t *testing.T) {
 	assert.Equal(t, string(take3.Bytes()), "abcdef")
 }
 
-func TestVariant(t *testing.T) {
+func TestVariants(t *testing.T) {
 	take := TakeBytesUntil(SearchAnyOf([][]byte{
 		[]byte("1234"),
 		[]byte("4321"),
@@ -60,67 +60,71 @@ func TestVariant(t *testing.T) {
 	assert.True(t, success)
 	assert.Equal(t, "abcdef12", string(take.Bytes()))
 	assert.Equal(t, string(rest), "34431")
+
+	take = TakeBytesUntil(SearchClosest([][]byte{
+		[]byte("12"),
+		[]byte("13"),
+		[]byte("99"),
+	}))
+	matcher = NewMatcher(take)
+
+	success, rest = matcher.Feed([]byte("abcdef 99 12"))
+	assert.True(t, success)
+	assert.Equal(t, "abcdef ", string(take.Bytes()))
+	assert.Equal(t, " 12", string(rest))
+
+	success, rest = matcher.Feed([]byte("abcdef 12 99"))
+	assert.True(t, success)
+	assert.Equal(t, "abcdef ", string(take.Bytes()))
+	assert.Equal(t, " 99", string(rest))
+
+	success, rest = matcher.Feed([]byte("abcdef 14 99"))
+	assert.True(t, success)
+	assert.Equal(t, "abcdef 14 ", string(take.Bytes()))
+	assert.Equal(t, len(rest), 0)
+
+	success, _ = matcher.Feed([]byte("abcedef  jsdlfkjk 914"))
+	assert.False(t, success)
 }
 
-func BenchmarkMatcher(b *testing.B) {
-	line := []byte("1\t2\t3\t4\t5")
-
-	i := 0
-	take1 := TakeBytesUntil(SearchByte('\t'))
-	take2 := TakeBytesUntil(SearchByte('\t'))
-	take3 := TakeBytesUntil(SearchByte('\t'))
-	take4 := TakeBytesUntil(SearchByte('\t'))
-	take5 := TakeBytesUntil(EndSeeker(true))
-	matcher := NewMatcher(take1, take2, take3, take4, take5)
-	for i < b.N {
-		success, rest := matcher.Feed(line)
-		if !(success && len(rest) == 0) {
-			b.Error("Wrong data")
-		}
-		if take1.Bytes()[0] != '1' || len(take1.Bytes()) > 1 {
-			b.Error("Wrong data")
-		}
-		if take2.Bytes()[0] != '2' || len(take2.Bytes()) > 1 {
-			b.Error("Wrong data")
-		}
-		if take3.Bytes()[0] != '3' || len(take3.Bytes()) > 1 {
-			b.Error("Wrong data")
-		}
-		if take4.Bytes()[0] != '4' || len(take4.Bytes()) > 1 {
-			b.Error("Wrong data")
-		}
-		if take5.Bytes()[0] != '5' || len(take5.Bytes()) > 1 {
-			b.Error("Wrong data")
-		}
-		i += 1
-	}
+func TestNegative(t *testing.T) {
+	matcher := NewMatcher(
+		PassBytesUntil(SearchUntilByte(byte('0'))))
+	ok, rest := matcher.Feed([]byte("00000000000000000111"))
+	assert.True(t, ok)
+	assert.Equal(t, string(rest), "111")
 }
 
-func BenchmarkSplit(b *testing.B) {
-	line := []byte("1\t2\t3\t4\t5")
-	sep := []byte("\t")
+func TestOnTheEnd(t *testing.T) {
+	matcher := NewMatcher(OnTheEnd(true))
+	ok, _ := matcher.Feed([]byte(""))
+	assert.True(t, ok)
 
-	i := 0
-	for i < b.N {
-		res := bytes.Split(line, sep)
-		if len(res) != 5 {
-			b.Error("Wrong data")
-		}
-		if res[0][0] != '1' || len(res[0]) > 1 {
-			b.Error("Wrong data")
-		}
-		if res[1][0] != '2' || len(res[1]) > 1 {
-			b.Error("Wrong data")
-		}
-		if res[2][0] != '3' || len(res[2]) > 1 {
-			b.Error("Wrong data")
-		}
-		if res[3][0] != '4' || len(res[3]) > 1 {
-			b.Error("Wrong data")
-		}
-		if res[4][0] != '5' || len(res[4]) > 1 {
-			b.Error("Wrong data")
-		}
-		i += 1
-	}
+	ok, _ = matcher.Feed([]byte("123"))
+	assert.False(t, ok)
+
+	matcher = NewMatcher(OnTheEnd(false))
+	ok, _ = matcher.Feed([]byte(""))
+	assert.False(t, ok)
+
+	ok, _ = matcher.Feed([]byte("123"))
+	assert.True(t, ok)
+}
+
+func TestReadyExpression(t *testing.T) {
+	pass15 := PassFuncCheck(func(x byte) bool {
+		return x == byte('1') || x == byte('5')
+	})
+	matcher := NewMatcher(
+		PassBytesUntil(SearchByte('#')),
+		pass15, pass15,
+		PassPattern([]byte("1110")),
+		PassBytesUntil(SearchUntilByte(byte('0'))),
+		OnTheEnd(true))
+
+	line := []byte(
+		"2016-06-10 21:39:53.474667642 +0300 MSK -- log entry #15111000")
+	res, rest := matcher.Feed(line)
+	assert.True(t, res)
+	fmt.Println(string(rest))
 }

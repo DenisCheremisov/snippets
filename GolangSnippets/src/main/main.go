@@ -3,6 +3,7 @@ package main
 import (
 	"arr"
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -11,29 +12,24 @@ import (
 const N = 100000000
 
 func main() {
-	tab := '\t'
-	nl := '\n'
-
-	take1 := dateseq.TakeBytesUntil(dateseq.SearchByte('\t'))
-	take2 := dateseq.TakeBytesUntil(dateseq.SearchByte('\t'))
-	take3 := dateseq.TakeBytesUntil(dateseq.SearchByte('\t'))
-	take4 := dateseq.TakeBytesUntil(dateseq.SearchByte('\t'))
-	take5 := dateseq.TakeBytesUntil(dateseq.EndSeeker(true))
-	matcher := dateseq.NewMatcher(take1, take2, take3, take4, take5)
+	pass15 := arr.PassFuncCheck(func(x byte) bool {
+		return x == byte('1') || x == byte('5')
+	})
+	matcher := arr.NewMatcher(
+		arr.PassBytesUntil(arr.SearchByte('#')),
+		pass15, pass15,
+		arr.PassPattern([]byte("1110")),
+		arr.PassBytesUntil(arr.SearchUntilByte(byte('0'))),
+		arr.OnTheEnd(true))
 
 	stdout := bufio.NewWriterSize(os.Stdout, 512*1024)
 	defer stdout.Flush()
-	stdin := bufio.NewReaderSize(os.Stdin, 512*1024)
+	source := bufio.NewReaderSize(os.Stdin, 512*1024)
 	for {
-		line, err := stdin.ReadBytes('\n')
+		line, err := source.ReadBytes('\n')
 		if len(line) > 0 {
-			if ok, rest := matcher.Feed(line); ok {
-				stdout.Write(take1.Bytes())
-				stdout.WriteRune(tab)
-				stdout.Write(take2.Bytes())
-				stdout.WriteRune(nl)
-			} else {
-				log.Println("ERROR: " + string(rest))
+			if ok, _ := matcher.Feed(line[:len(line)-1]); ok {
+				fmt.Printf("Match: %s", string(line))
 			}
 		}
 

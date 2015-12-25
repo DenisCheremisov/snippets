@@ -1,4 +1,4 @@
-package dateseq
+package arr
 
 import (
 	"compress/gzip"
