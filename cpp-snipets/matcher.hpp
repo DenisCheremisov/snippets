@@ -96,6 +96,18 @@ public:
 };
 
 
+class OnTheEnd: public Taker {
+private:
+    bool flag;
+
+public:
+    OnTheEnd(bool f): flag(f) {}
+
+    bool take(const Line &line, const char *&rest) {
+    }
+}
+
+
 class SearchString  {
     const char *string;
     int length;
