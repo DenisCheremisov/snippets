@@ -52,14 +52,14 @@ func TestFssLogMeta(t *testing.T) {
 	if !assert.True(t, ok) {
 		return
 	}
-	if !assert.Equal(t, dtime.Unix(), tstamp) {
+	if !assert.Equal(t, dtime.UnixNano(), tstamp) {
 		return
 	}
 	tstamp, ok = meta.LineTimestamp([]byte("2016-04-03 01:02:15|ahahah"))
 	if !assert.True(t, ok) {
 		return
 	}
-	if !assert.Equal(t, dtime.Unix()+12, tstamp) {
+	if !assert.Equal(t, dtime.UnixNano()+12*int64(time.Second), tstamp) {
 		return
 	}
 }
@@ -84,7 +84,7 @@ func TestScanner(t *testing.T) {
 		if !assert.Equal(t, string(line), sc.Text()) {
 			return
 		}
-		if !assert.Equal(t, tstamp, timestamps[i]) {
+		if !assert.Equal(t, tstamp, timestamps[i]*int64(time.Second)) {
 			return
 		}
 		i = i + 1

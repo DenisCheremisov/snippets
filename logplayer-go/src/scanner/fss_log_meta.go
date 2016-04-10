@@ -40,11 +40,11 @@ func (meta *FssLogMeta) LineTimestamp(line []byte) (int64, bool) {
 		if err != nil {
 			return 0, false
 		}
-		meta.prevDayTstamp = tstamp.Unix()
+		meta.prevDayTstamp = tstamp.UnixNano()
 		meta.prevDay = day
 	}
 	return meta.prevDayTstamp +
-		(int64(line[11]-'0')*10+int64(line[12]-'0'))*3600 +
-		(int64(line[14]-'0')*10+int64(line[15]-'0'))*60 +
-		(int64(line[17]-'0')*10 + int64(line[18]-'0')), true
+		((int64(line[11]-'0')*10+int64(line[12]-'0'))*3600+
+			(int64(line[14]-'0')*10+int64(line[15]-'0'))*60+
+			(int64(line[17]-'0')*10+int64(line[18]-'0')))*int64(time.Second), true
 }
