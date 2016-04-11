@@ -8,7 +8,6 @@ import (
 type Output struct {
 	firstLogStamp    int64
 	firstOutputStamp int64
-	lastLogStamp     int64
 	writer           io.Writer
 	speedup          int64
 
@@ -30,12 +29,13 @@ func NewOutput(writer io.Writer, speedup int64) *Output {
 func (o *Output) append(line []byte) {
 	for len(line)+o.curLength+1 > len(o.buf) {
 		newBuf := make([]byte, len(o.buf)*2)
+		copy(newBuf, o.buf)
 		o.buf = newBuf
 	}
 
+	o.buf[o.curLength] = '\n'
 	copy(o.buf[o.curLength+1:], line)
-	o.buf[o.curLength+len(line)] = '\n'
-	o.curLength += 1 + len(line)
+	o.curLength = o.curLength + 1 + len(line)
 }
 
 func (o *Output) Write(res []LineItem) bool {
@@ -47,12 +47,10 @@ func (o *Output) Write(res []LineItem) bool {
 	if o.firstOutputStamp == 0 {
 		o.firstOutputStamp = time.Now().UnixNano()
 		o.firstLogStamp = res[0].stamp
-		o.lastLogStamp = res[0].stamp
 	} else {
 		now := time.Now().UnixNano()
-		delta = (lastStamp - o.firstLogStamp) - (now - o.firstOutputStamp)
+		delta = (lastStamp-o.firstLogStamp)/o.speedup - (now - o.firstOutputStamp)
 	}
-	delta /= o.speedup
 
 	for _, line := range res {
 		if line.stamp == lastStamp {
@@ -62,10 +60,8 @@ func (o *Output) Write(res []LineItem) bool {
 		if delta > 0 {
 			time.Sleep(time.Duration(delta))
 			delta = 0
-		} else {
-			delta += (lastStamp - o.lastLogStamp) / o.speedup
 		}
-		o.lastLogStamp = lastStamp
+		delta += (line.stamp - lastStamp) / o.speedup
 		lastStamp = line.stamp
 		o.writer.Write(o.buf[:o.curLength])
 		o.curLength = 0
@@ -73,7 +69,6 @@ func (o *Output) Write(res []LineItem) bool {
 	}
 	if o.curLength > 0 {
 		time.Sleep(time.Duration(delta))
-		o.lastLogStamp = lastStamp
 		o.writer.Write(o.buf[:o.curLength])
 		o.curLength = 0
 	}
