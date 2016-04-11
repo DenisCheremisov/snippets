@@ -38,8 +38,8 @@ func TestTimeHourSequencer(t *testing.T) {
 
 func TestFssLogMeta(t *testing.T) {
 	day, _ := strptime.Parse("2016-04-03", "%Y-%m-%d")
-	meta := NewFssLogMeta(
-		"/1/2/3/bos_srv-k01a.fss.log.{DATE}", day, day.Add(time.Second))
+	seq := NewTimeHourSequencer(day, day.Add(time.Second))
+	meta := NewFssLogMeta("/1/2/3/bos_srv-k01a.fss.log.%Y%m%d%H", seq)
 	if !assert.True(t, meta.Next()) {
 		return
 	}
@@ -67,8 +67,9 @@ func TestFssLogMeta(t *testing.T) {
 func TestScanner(t *testing.T) {
 	from, _ := strptime.Parse("2016-01-14 00:02:00", "%Y-%m-%d %H:%M:%S")
 	to, _ := strptime.Parse("2016-01-14 00:02:01", "%Y-%m-%d %H:%M:%S")
+	seq := NewTimeHourSequencer(from, to)
 
-	meta := NewFssLogMeta("./data_test/bos_srv-k011e.fss.log.{DATE}", from, to)
+	meta := NewFssLogMeta("./data_test/bos_srv-k011e.fss.log.%Y%m%d%H", seq)
 	timestamps := []int64{
 		1452729595, 1452729595, 1452729595, 1452729596, 1452729596}
 
@@ -92,7 +93,8 @@ func TestScanner(t *testing.T) {
 
 	from = from.Add(time.Second * 3600)
 	to = to.Add(time.Second * 3600)
-	meta = NewFssLogMeta("./data_test/bos_srv-k011e.fss.log.{DATE}", from, to)
+	seq = NewTimeHourSequencer(from, to)
+	meta = NewFssLogMeta("./data_test/bos_srv-k011e.fss.log.%Y%m%d%H", seq)
 	scanner = NewScanner(meta)
 	for scanner.Scan() {
 		line, tstamp := scanner.Data()

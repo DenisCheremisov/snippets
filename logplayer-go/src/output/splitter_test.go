@@ -12,8 +12,9 @@ import (
 func TestLogSplit(t *testing.T) {
 	from, _ := strptime.Parse("2016-01-13 00:02:00", "%Y-%m-%d %H:%M:%S")
 	to, _ := strptime.Parse("2016-01-13 00:02:01", "%Y-%m-%d %H:%M:%S")
+	seq := scanner.NewTimeHourSequencer(from, to)
 
-	meta := scanner.NewFssLogMeta("data_test/bos_srv-k011a.fss.log.{DATE}", from, to)
+	meta := scanner.NewFssLogMeta("data_test/bos_srv-k011a.fss.log.%Y%m%d%H", seq)
 	scanner := scanner.NewScanner(meta)
 	channel := make(chan []LineItem)
 

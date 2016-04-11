@@ -5,7 +5,13 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 )
+
+type TimeSequencer interface {
+	Next() bool
+	Time() time.Time
+}
 
 // FileMeta define an abstraction over some log file's attributes
 type LogMeta interface {

@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"strings"
 	"time"
 
 	"github.com/jehiah/go-strftime"
@@ -9,25 +8,28 @@ import (
 )
 
 type FssLogMeta struct {
-	TimeHourSequencer
+	seq TimeSequencer
 
 	path          string
 	prevDay       int
 	prevDayTstamp int64
 }
 
-func NewFssLogMeta(path string, from time.Time, to time.Time) *FssLogMeta {
+func NewFssLogMeta(path string, seq TimeSequencer) *FssLogMeta {
 	return &FssLogMeta{
-		TimeHourSequencer: NewTimeHourSequencer(from, to),
-		path:              path,
-		prevDay:           -1111,
-		prevDayTstamp:     0,
+		seq:           seq,
+		path:          path,
+		prevDay:       -1111,
+		prevDayTstamp: 0,
 	}
 }
 
+func (meta *FssLogMeta) Next() bool {
+	return meta.seq.Next()
+}
+
 func (meta *FssLogMeta) Name() string {
-	return strings.Replace(
-		meta.path, "{DATE}", strftime.Format("%Y%m%d%H", meta.cur), 1)
+	return strftime.Format(meta.path, meta.seq.Time())
 }
 
 func (meta *FssLogMeta) LineTimestamp(line []byte) (int64, bool) {
