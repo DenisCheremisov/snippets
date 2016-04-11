@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"bufio"
+	"compress/gzip"
 	"io"
 	"log"
 	"os"
@@ -22,7 +23,7 @@ type LogMeta interface {
 
 type Scanner struct {
 	r    *bufio.Reader
-	rraw *os.File
+	file *os.File
 
 	line   []byte
 	tstamp int64
@@ -38,7 +39,7 @@ func NewScanner(meta LogMeta) *Scanner {
 		meta: meta,
 
 		r:         nil,
-		rraw:      nil,
+		file:      nil,
 		line:      nil,
 		tstamp:    0,
 		res:       nil,
@@ -47,19 +48,30 @@ func NewScanner(meta LogMeta) *Scanner {
 }
 
 func (s *Scanner) reopen() (ok bool, err error) {
-	if s.rraw != nil {
-		s.rraw.Close()
-		s.rraw = nil
+	if s.file != nil {
+		s.file.Close()
+		s.file = nil
 		s.r = nil
 	}
 	if !s.meta.Next() {
 		return false, nil
 	}
-	s.rraw, err = os.Open(s.meta.Name())
+	s.file, err = os.Open(s.meta.Name())
 	if err != nil {
-		return false, err
+		// Cannot open, try .gz name
+		name := s.meta.Name() + ".gz"
+		s.file, err = os.Open(name)
+		if err != nil {
+			return false, err
+		}
+		stream, err := gzip.NewReader(s.file)
+		if err != nil {
+			return false, err
+		}
+		s.r = bufio.NewReader(stream)
+	} else {
+		s.r = bufio.NewReader(s.file)
 	}
-	s.r = bufio.NewReader(s.rraw)
 	return true, nil
 }
 
