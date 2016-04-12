@@ -2,6 +2,7 @@ package output
 
 import (
 	"io"
+	"log"
 	"time"
 )
 
@@ -27,15 +28,15 @@ func NewOutput(writer io.Writer, speedup int64) *Output {
 }
 
 func (o *Output) append(line []byte) {
-	for len(line)+o.curLength+1 > len(o.buf) {
+	for o.curLength+len(line)+1 > len(o.buf) {
 		newBuf := make([]byte, len(o.buf)*2)
 		copy(newBuf, o.buf)
 		o.buf = newBuf
 	}
 
-	o.buf[o.curLength] = '\n'
-	copy(o.buf[o.curLength+1:], line)
-	o.curLength = o.curLength + 1 + len(line)
+	copy(o.buf[o.curLength:], line)
+	o.curLength = o.curLength + len(line) + 1
+	o.buf[o.curLength] = byte('\n')
 }
 
 func (o *Output) Write(res []LineItem) bool {
@@ -57,19 +58,21 @@ func (o *Output) Write(res []LineItem) bool {
 			o.append(line.data)
 			continue
 		}
+		log.Println(delta)
 		if delta > 0 {
 			time.Sleep(time.Duration(delta))
 			delta = 0
 		}
 		delta += (line.stamp - lastStamp) / o.speedup
 		lastStamp = line.stamp
-		o.writer.Write(o.buf[:o.curLength])
+		o.writer.Write(o.buf[:o.curLength+1])
 		o.curLength = 0
 		o.append(line.data)
 	}
 	if o.curLength > 0 {
+		log.Println(delta)
 		time.Sleep(time.Duration(delta))
-		o.writer.Write(o.buf[:o.curLength])
+		o.writer.Write(o.buf[:o.curLength+1])
 		o.curLength = 0
 	}
 	return true
