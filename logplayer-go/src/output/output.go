@@ -2,7 +2,6 @@ package output
 
 import (
 	"io"
-	"log"
 	"time"
 )
 
@@ -10,20 +9,25 @@ type Output struct {
 	firstLogStamp    int64
 	firstOutputStamp int64
 	writer           io.Writer
-	speedup          int64
+	sleeper          Sleeper
 
 	buf       []byte
 	curLength int
 }
 
-func NewOutput(writer io.Writer, speedup int64) *Output {
+type Sleeper interface {
+	Delta(int64) int64
+	Sync()
+}
+
+func NewOutput(writer io.Writer, sleeper Sleeper) *Output {
 	return &Output{
 		writer:           writer,
 		firstLogStamp:    0,
 		firstOutputStamp: 0,
 		buf:              make([]byte, 128*1024),
 		curLength:        0,
-		speedup:          speedup,
+		sleeper:          sleeper,
 	}
 }
 
@@ -36,43 +40,30 @@ func (o *Output) append(line []byte) {
 
 	copy(o.buf[o.curLength:], line)
 	o.curLength = o.curLength + len(line) + 1
-	o.buf[o.curLength] = byte('\n')
+	o.buf[o.curLength-1] = byte('\n')
 }
 
 func (o *Output) Write(res []LineItem) bool {
 	if len(res) == 0 {
 		return false
 	}
-	delta := int64(0)
 	lastStamp := res[0].stamp
-	if o.firstOutputStamp == 0 {
-		o.firstOutputStamp = time.Now().UnixNano()
-		o.firstLogStamp = res[0].stamp
-	} else {
-		now := time.Now().UnixNano()
-		delta = (lastStamp-o.firstLogStamp)/o.speedup - (now - o.firstOutputStamp)
-	}
-
+	o.sleeper.Sync()
 	for _, line := range res {
 		if line.stamp == lastStamp {
 			o.append(line.data)
 			continue
 		}
-		log.Println(delta)
-		if delta > 0 {
-			time.Sleep(time.Duration(delta))
-			delta = 0
-		}
-		delta += (line.stamp - lastStamp) / o.speedup
+		delta := o.sleeper.Delta(lastStamp)
 		lastStamp = line.stamp
-		o.writer.Write(o.buf[:o.curLength+1])
+		time.Sleep(time.Duration(delta))
+		o.writer.Write(o.buf[:o.curLength])
 		o.curLength = 0
 		o.append(line.data)
 	}
 	if o.curLength > 0 {
-		log.Println(delta)
-		time.Sleep(time.Duration(delta))
-		o.writer.Write(o.buf[:o.curLength+1])
+		time.Sleep(time.Duration(o.sleeper.Delta(lastStamp)))
+		o.writer.Write(o.buf[:o.curLength])
 		o.curLength = 0
 	}
 	return true

@@ -7,6 +7,10 @@ type LineItem struct {
 	stamp int64
 }
 
+func (item LineItem) Line() string {
+	return string(item.data)
+}
+
 type Splitter struct {
 	prebuf int64
 

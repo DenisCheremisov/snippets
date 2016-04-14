@@ -1,21 +1,22 @@
-package scanner
+package bos
 
 import (
 	"time"
+	"utils"
 
 	"github.com/jehiah/go-strftime"
 	"github.com/pbnjay/strptime"
 )
 
 type FssLogMeta struct {
-	seq TimeSequencer
+	seq utils.TimeSequencer
 
 	path          string
 	prevDay       int
 	prevDayTstamp int64
 }
 
-func NewFssLogMeta(path string, seq TimeSequencer) *FssLogMeta {
+func NewFssLogMeta(path string, seq utils.TimeSequencer) *FssLogMeta {
 	return &FssLogMeta{
 		seq:           seq,
 		path:          path,

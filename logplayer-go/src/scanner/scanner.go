@@ -6,13 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"time"
 )
-
-type TimeSequencer interface {
-	Next() bool
-	Time() time.Time
-}
 
 // FileMeta define an abstraction over some log file's attributes
 type LogMeta interface {
@@ -68,7 +62,7 @@ func (s *Scanner) reopen() (ok bool, err error) {
 		if err != nil {
 			return false, err
 		}
-		s.r = bufio.NewReader(stream)
+		s.r = bufio.NewReaderSize(stream, 512*1024)
 	} else {
 		s.r = bufio.NewReader(s.file)
 	}
@@ -87,6 +81,9 @@ func (s *Scanner) Scan() bool {
 	}
 	for {
 		line, is_prefix, err := s.r.ReadLine()
+		new_line := make([]byte, len(line))
+		copy(new_line, line)
+		line = new_line
 		if err == io.EOF && len(line) == 0 {
 			if len(s.line) > 0 {
 				s.res = s.line
@@ -121,6 +118,7 @@ func (s *Scanner) Scan() bool {
 		if !ok {
 			if s.line == nil {
 				continue
+
 			} else {
 				new_line := make([]byte, len(s.line)+len(line)+1)
 				copy(new_line[:len(s.line)], s.line)

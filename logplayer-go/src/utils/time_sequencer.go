@@ -1,9 +1,14 @@
-package scanner
+package utils
 
 import (
 	"log"
 	"time"
 )
+
+type TimeSequencer interface {
+	Next() bool
+	Time() time.Time
+}
 
 // TimeHourSequencer represents 1-hour time sequence between
 type BasicTimeSequencer struct {

@@ -1,7 +1,6 @@
 package output
 
 import (
-	"log"
 	"testing"
 	"time"
 
@@ -30,7 +29,6 @@ func TestLogSleeper(t *testing.T) {
 		return
 	}
 
-	log.Println(d)
 	if !assert.True(t, d > 29999*int64(time.Second)/10000) {
 		return
 	}
