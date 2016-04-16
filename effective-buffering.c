@@ -8,7 +8,7 @@
 
 
 typedef struct {
-    char buf[BUF_LENGTH];
+    char buf
     int current;
     int out_fd;
 } writer;
