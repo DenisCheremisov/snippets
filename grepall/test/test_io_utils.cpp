@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <ioutils/reader.hh>
+#include <ioutils/writer.hh>
 #include <ioutils/bufio.hh>
 
 
@@ -83,4 +84,20 @@ TEST(IOUtilsTests, BufReaderTestChunking) {
             ASSERT_EQ(std::string(buf.buf, buf.len), std::string(samples[i]));
         }
     }
+}
+
+
+TEST(IOUtilsTests, StrWriter) {
+    io::StrWriter writer(1);
+    const char *samples[] = {
+        "1", "23", "456", "789a", "bcdef", "ghijkl",
+        "mnopqrs", "tuvwxyz"
+    };
+    for(auto it: samples) {
+        writer.write(it, strlen(it));
+    }
+
+    ASSERT_EQ(std::string(writer.buf, writer.cur),
+              "123456789abcdefghijklmnopqrstuvwxyz");
+    ASSERT_EQ(writer.cur <= writer.capacity, true);
 }

@@ -80,4 +80,7 @@ namespace bufio {
             }
         }
     };
+
+    class LineWriter {
+    };
 }
