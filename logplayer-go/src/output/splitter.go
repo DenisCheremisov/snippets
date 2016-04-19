@@ -19,6 +19,8 @@ type Splitter struct {
 
 	lastLine  []byte
 	lastStamp int64
+
+	buf []byte
 }
 
 func NewSplitter(prebuf int64, scn *scanner.Scanner, ch chan []LineItem) *Splitter {
@@ -28,11 +30,26 @@ func NewSplitter(prebuf int64, scn *scanner.Scanner, ch chan []LineItem) *Splitt
 		channel:   ch,
 		lastLine:  nil,
 		lastStamp: 0,
+		buf:       make([]byte, 0, 64*1024),
 	}
 }
 
 func (idx *Splitter) GetChannel() chan []LineItem {
 	return idx.channel
+}
+
+func (idx *Splitter) reallocate(line []byte) []byte {
+	prev_len := len(idx.buf)
+	idx.buf = append(idx.buf, line...)
+	return idx.buf[prev_len:]
+}
+
+func (idx *Splitter) refreshBuf() {
+	capacity := 64 * 1024
+	if cap(idx.buf) > capacity {
+		capacity = cap(idx.buf)
+	}
+	idx.buf = make([]byte, 0, capacity)
 }
 
 func (idx *Splitter) Split() {
@@ -62,10 +79,16 @@ func (idx *Splitter) Split() {
 			line, stamp := idx.scanner.Data()
 
 			if stamp >= bound {
+				idx.refreshBuf()
+			}
+			line = idx.reallocate(line)
+
+			if stamp >= bound {
 				idx.lastLine = line
 				idx.lastStamp = stamp
 				break
 			}
+
 			if curLength == len(buf) {
 				newBuf := make([]LineItem, curLength*2)
 				copy(newBuf, buf)

@@ -81,9 +81,6 @@ func (s *Scanner) Scan() bool {
 	}
 	for {
 		line, is_prefix, err := s.r.ReadLine()
-		new_line := make([]byte, len(line))
-		copy(new_line, line)
-		line = new_line
 		if err == io.EOF && len(line) == 0 {
 			if len(s.line) > 0 {
 				s.res = s.line
