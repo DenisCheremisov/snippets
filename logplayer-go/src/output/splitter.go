@@ -65,13 +65,12 @@ func (idx *Splitter) Split() {
 	bound := idx.lastStamp
 	for {
 		bound = bound + idx.prebuf*((idx.lastStamp-bound)/idx.prebuf+1)
-		buf := make([]LineItem, estimatedCapacity)
+		buf := make([]LineItem, 1, estimatedCapacity)
 
 		buf[0] = LineItem{
 			data:  idx.lastLine,
 			stamp: idx.lastStamp,
 		}
-		curLength := 1
 		idx.lastLine = nil
 		count := 0
 		for idx.scanner.Scan() {
@@ -86,25 +85,23 @@ func (idx *Splitter) Split() {
 			if stamp >= bound {
 				idx.lastLine = line
 				idx.lastStamp = stamp
+				if cap(buf) > estimatedCapacity {
+					estimatedCapacity = cap(buf)
+				}
 				break
 			}
 
-			if curLength == len(buf) {
-				newBuf := make([]LineItem, curLength*2)
-				copy(newBuf, buf)
-				buf = newBuf
-				estimatedCapacity = len(buf)
-			}
-			buf[curLength] = LineItem{
+			buf = append(buf, LineItem{
 				data:  line,
 				stamp: stamp,
-			}
-			curLength += 1
+			})
 		}
 
-		idx.channel <- buf[:curLength]
 		if count == 0 {
+			idx.channel <- nil
 			break
+		} else {
+			idx.channel <- buf
 		}
 	}
 }

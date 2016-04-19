@@ -98,6 +98,7 @@ func TestLogSplit(t *testing.T) {
 
 	res = <-channel
 	if res != nil {
+		log.Println(res)
 		log.Println("res must be nil after file was read out")
 	}
 

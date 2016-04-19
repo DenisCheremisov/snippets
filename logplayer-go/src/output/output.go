@@ -11,8 +11,7 @@ type Output struct {
 	writer           io.Writer
 	sleeper          Sleeper
 
-	buf       []byte
-	curLength int
+	buf []byte
 }
 
 type Sleeper interface {
@@ -25,22 +24,14 @@ func NewOutput(writer io.Writer, sleeper Sleeper) *Output {
 		writer:           writer,
 		firstLogStamp:    0,
 		firstOutputStamp: 0,
-		buf:              make([]byte, 128*1024),
-		curLength:        0,
+		buf:              make([]byte, 0, 128*1024),
 		sleeper:          sleeper,
 	}
 }
 
 func (o *Output) append(line []byte) {
-	for o.curLength+len(line)+1 > len(o.buf) {
-		newBuf := make([]byte, len(o.buf)*2)
-		copy(newBuf, o.buf)
-		o.buf = newBuf
-	}
-
-	copy(o.buf[o.curLength:], line)
-	o.curLength = o.curLength + len(line) + 1
-	o.buf[o.curLength-1] = byte('\n')
+	o.buf = append(o.buf, line...)
+	o.buf = append(o.buf, '\n')
 }
 
 func (o *Output) Write(res []LineItem) bool {
@@ -57,14 +48,14 @@ func (o *Output) Write(res []LineItem) bool {
 		delta := o.sleeper.Delta(lastStamp)
 		lastStamp = line.stamp
 		time.Sleep(time.Duration(delta))
-		o.writer.Write(o.buf[:o.curLength])
-		o.curLength = 0
+		o.writer.Write(o.buf)
+		o.buf = o.buf[:0]
 		o.append(line.data)
 	}
-	if o.curLength > 0 {
+	if len(o.buf) > 0 {
 		time.Sleep(time.Duration(o.sleeper.Delta(lastStamp)))
-		o.writer.Write(o.buf[:o.curLength])
-		o.curLength = 0
+		o.writer.Write(o.buf)
+		o.buf = o.buf[:0]
 	}
 	return true
 }
