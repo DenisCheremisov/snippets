@@ -58,6 +58,7 @@ func (idx *Splitter) Split() {
 			return
 		} else {
 			idx.lastLine, idx.lastStamp = idx.scanner.Data()
+			idx.lastLine = idx.reallocate(idx.lastLine)
 		}
 	}
 
