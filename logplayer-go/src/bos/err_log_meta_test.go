@@ -35,4 +35,12 @@ func TestErrLogMeta(t *testing.T) {
 	if !assert.Equal(t, dtime.UnixNano()+19*int64(time.Second), tstamp) {
 		return
 	}
+	tstamp, ok = meta.LineTimestamp([]byte("04/000001: ahahah"))
+	if !assert.True(t, ok) {
+		return
+	}
+	if !assert.Equal(t, dtime.UnixNano()+(19+3600*24)*int64(time.Second), tstamp) {
+		return
+	}
+
 }
