@@ -2,14 +2,18 @@
 
 #include <algorithm>
 #include <cerrno>
-#include <stdint.h>
+#include <cstdint>
 #include <cstring>
+#include <cstdio>
+#include <cassert>
 
 #include <unistd.h>
+#include <zlib.h>
 
 #include <ioutils/io.hh>
 
 #include <iostream>
+
 
 namespace io {
 
@@ -17,6 +21,9 @@ namespace io {
         int fd;
     public:
         FileReader(int _fd): fd(_fd) {};
+        ~FileReader() {
+            close(fd);
+        }
 
         int64_t read(char *buf, int64_t count) {
             return (int64_t) ::read(fd, buf, (size_t)count);
@@ -44,6 +51,91 @@ namespace io {
             memcpy(_buf, this->buf + pos, delta);
             pos += delta;
             return delta;
+        }
+    };
+
+    template <uint64_t CHUNK>
+    class GzipReader: public Reader {
+        int fd;
+
+        char in_buf[CHUNK];
+        char out_buf[CHUNK];
+        uint64_t out_pos;
+        uint64_t have;
+
+        z_stream strm;
+        bool ended;
+        bool reread;
+
+    public:
+        GzipReader(int _fd) {
+            fd = _fd;
+            ended = false;
+            have = 0;
+            out_pos = 0;
+            reread = true;
+            strm.zalloc = Z_NULL;
+            strm.zfree = Z_NULL;
+            strm.avail_in = 0;
+            strm.next_in = Z_NULL;
+            assert(inflateInit2(&strm, 16 + MAX_WBITS) == Z_OK);
+        }
+
+        ~GzipReader() {
+            close(fd);
+        }
+
+        int64_t read(char*buf, int64_t n) {
+            int64_t read_len = 0;
+            int ret_code;
+            while (true) {
+                if ((have - out_pos) >= n) {
+                    memcpy(buf, out_buf + out_pos, n);
+                    out_pos += n;
+                    return read_len + n;
+                }
+                if (out_pos < have) {
+                    memcpy(buf, out_buf + out_pos, have - out_pos);
+                    buf += have - out_pos;
+                    n -= have - out_pos;
+                    read_len += have - out_pos;
+                    out_pos = have = 0;
+                } else {
+                    out_pos = have = 0;
+                }
+                if (ended) {
+                    return read_len;
+                }
+
+                if (strm.avail_in == 0) {
+                    auto k = ::read(fd, in_buf, CHUNK);
+                    strm.avail_in = k;
+                    if (strm.avail_in <= 0) {
+                        inflateEnd(&strm);
+                        return strm.avail_in;
+                    }
+                    strm.next_in = (unsigned char*)in_buf;
+                }
+
+                strm.avail_out = CHUNK;
+                strm.next_out = (unsigned char*)out_buf;
+                ret_code = inflate(&strm, Z_NO_FLUSH);
+                switch (ret_code) {
+                case Z_STREAM_ERROR:
+                case Z_NEED_DICT:
+                case Z_DATA_ERROR:
+                case Z_MEM_ERROR:
+                case Z_BUF_ERROR:
+                case Z_VERSION_ERROR:
+                    inflateEnd(&strm);
+                    return ret_code;
+                    break;
+                case Z_STREAM_END:
+                    ended = true;
+                    inflateEnd(&strm);
+                }
+                have = CHUNK - strm.avail_out;
+            }
         }
     };
 }

@@ -12,17 +12,14 @@ namespace bufio {
         _ERR
     };
 
-    class Buf {
-    public:
+    struct Buf {
         char *buf;
         uint64_t len;
-
-        Buf() {}
     };
 
     class Reader {
         char *buf;
-        int capacity;
+        uint64_t capacity;
         int curlength;
         int current;
         io::Reader *raw_reader;
@@ -37,6 +34,10 @@ namespace bufio {
         }
         ~Reader() {
             delete [] buf;
+        }
+
+        uint64_t get_capacity() const {
+            return capacity;
         }
 
         read_result_t readline(Buf *dst) {
