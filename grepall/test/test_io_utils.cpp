@@ -107,7 +107,7 @@ TEST(IOUtilsTests, BufReaderTestChunking) {
 
 
 TEST(IOUtilsTests, StrWriter) {
-    io::StrWriter writer(1);
+    io::StrWriter writer;
     const char *samples[] = {
         "1", "23", "456", "789a", "bcdef", "ghijkl",
         "mnopqrs", "tuvwxyz"
@@ -116,9 +116,7 @@ TEST(IOUtilsTests, StrWriter) {
         writer.write(it, strlen(it));
     }
 
-    ASSERT_EQ(std::string(writer.buf, writer.cur),
-              "123456789abcdefghijklmnopqrstuvwxyz");
-    ASSERT_EQ(writer.cur <= writer.capacity, true);
+    ASSERT_EQ(writer.buf, "123456789abcdefghijklmnopqrstuvwxyz");
 }
 
 
