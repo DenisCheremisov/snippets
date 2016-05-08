@@ -122,7 +122,8 @@ TEST(IOUtilsTests, StrWriter) {
 
 TEST(IOUtilsTests, GzipReader) {
     int fd = open("test/data/test.gz", O_RDONLY);
-    io::GzipReader<512*1024> reader(fd);
+    io::FileReader rawReader(fd);
+    io::GzipReader<512*1024> reader(&rawReader);
     bufio::Reader b(&reader, 512*1024);
     bufio::Buf line;
 

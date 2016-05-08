@@ -9,6 +9,7 @@
 
 #include <unistd.h>
 #include <zlib.h>
+#include <fcntl.h>
 
 #include <ioutils/io.hh>
 
@@ -19,14 +20,19 @@ namespace io {
 
     class FileReader: public Reader {
         int fd;
+        uint64_t pos;
+
     public:
-        FileReader(int _fd): fd(_fd) {};
+        FileReader(int _fd): fd(_fd), pos(0) {};
         ~FileReader() {
             close(fd);
         }
 
         int64_t read(char *buf, int64_t count) {
-            return (int64_t) ::read(fd, buf, (size_t)count);
+            auto bytes_read = (int64_t) ::read(fd, buf, (size_t)count);
+            pos += bytes_read;
+            readahead(fd, pos, count);
+            return bytes_read;
         }
     };
 
@@ -56,7 +62,7 @@ namespace io {
 
     template <uint64_t CHUNK>
     class GzipReader: public Reader {
-        int fd;
+        FileReader *reader;
 
         char in_buf[CHUNK];
         char out_buf[CHUNK];
@@ -65,24 +71,18 @@ namespace io {
 
         z_stream strm;
         bool ended;
-        bool reread;
 
     public:
-        GzipReader(int _fd) {
-            fd = _fd;
+        GzipReader(FileReader *_reader) {
+            reader = _reader;
             ended = false;
             have = 0;
             out_pos = 0;
-            reread = true;
             strm.zalloc = Z_NULL;
             strm.zfree = Z_NULL;
             strm.avail_in = 0;
             strm.next_in = Z_NULL;
             assert(inflateInit2(&strm, 16 + MAX_WBITS) == Z_OK);
-        }
-
-        ~GzipReader() {
-            close(fd);
         }
 
         int64_t read(char*buf, int64_t n) {
@@ -108,7 +108,7 @@ namespace io {
                 }
 
                 if (strm.avail_in == 0) {
-                    auto k = ::read(fd, in_buf, CHUNK);
+                    auto k = reader->read(in_buf, CHUNK);
                     strm.avail_in = k;
                     if (strm.avail_in <= 0) {
                         inflateEnd(&strm);
