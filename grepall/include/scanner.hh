@@ -191,7 +191,7 @@ namespace main {
     };
 
 
-    class FilteringLineReader: LineReader {
+    class FilteringLineReader: public LineReader {
         LogScanner *scanner;
         Filter *filter;
 

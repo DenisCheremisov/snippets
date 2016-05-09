@@ -1,5 +1,6 @@
 #include <list>
 #include <string>
+#include <memory>
 
 #include <gtest/gtest.h>
 
@@ -159,4 +160,94 @@ TEST(MainTests, CareLogReaderWait) {
         abs_counter += 1;
     }
     ASSERT_EQ(abs_counter, 5);
+}
+
+
+class DummyFilter: public main::Filter {
+    bool current;
+
+public:
+    DummyFilter(bool cur): current(cur) {}
+
+    bool match(const char *line, uint64_t len) {
+        current = !current;
+        return current;
+    }
+};
+
+
+class SuperDummyMeta: public logtools::LogMeta {
+    int counter;
+
+public:
+    SuperDummyMeta(int c): counter(c) {}
+
+    bool next() {
+        return true;
+    }
+    std::string name() {
+        return "";
+    }
+    time_t line_stamp(const char *line, int len) {
+        return counter++;
+    }
+};
+
+
+class ReaderFactory {
+    std::shared_ptr<io::Reader> rawReader;
+    std::shared_ptr<bufio::Reader> reader;
+    std::shared_ptr<logtools::LogMeta> meta;
+    std::shared_ptr<main::LogScanner> scanner;
+    std::shared_ptr<main::Filter> filter;
+
+public:
+    ReaderFactory(io::Reader *r, main::Filter *f) {
+        rawReader = std::shared_ptr<io::Reader>(r);
+        reader = std::shared_ptr<bufio::Reader>(
+            new bufio::Reader(r, 512*1024));
+        meta = std::shared_ptr<logtools::LogMeta>(
+            new DummyOddSkipper());
+        scanner = std::shared_ptr<main::LogScanner>(
+            new main::LogScanner(meta.get(), reader.get(), 1024));
+        filter = std::shared_ptr<main::Filter>(f);
+    }
+
+    std::shared_ptr<main::FilteringLineReader> get() {
+        return std::shared_ptr<main::FilteringLineReader>(
+            new main::FilteringLineReader(scanner.get(), filter.get()));
+    }
+};
+
+
+
+TEST(MainTests, FilteringLineReaderTest) {
+    ReaderFactory f1(new io::StrReader("f1\nf2\nf3\nf4\nf5\nf6\nf7"),
+                   new DummyFilter(false));
+    ReaderFactory f2(new io::StrReader("s1\ns2\ns3\ns4\ns5\ns6\ns7"),
+                   new DummyFilter(true));
+    auto r1 = f1.get();
+    auto r2 = f2.get();
+
+    io::StrWriter writer;
+    main::Visitor visitor(&writer, 1024);
+
+    visitor.add_reader(r1.get());
+    visitor.add_reader(r2.get());
+
+    ASSERT_EQ(visitor.visit_all(0), 2);
+    visitor.flush();
+    ASSERT_EQ(writer.buf, "f1\nf2\n");
+
+    ASSERT_EQ(visitor.visit_all(1), 2);
+    visitor.flush();
+    ASSERT_EQ(writer.buf, "f1\nf2\ns3\ns4\n");
+
+    ASSERT_EQ(visitor.visit_all(2), 2);
+    visitor.flush();
+    ASSERT_EQ(writer.buf, "f1\nf2\ns3\ns4\nf5\nf6\n");
+
+    ASSERT_EQ(visitor.visit_all(3), 0);
+    visitor.flush();
+    ASSERT_EQ(writer.buf, "f1\nf2\ns3\ns4\nf5\nf6\ns7\n");
 }

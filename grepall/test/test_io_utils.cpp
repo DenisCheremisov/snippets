@@ -106,6 +106,22 @@ TEST(IOUtilsTests, BufReaderTestChunking) {
 }
 
 
+TEST(IOUtilsTests, BufioProbableRegression) {
+    io::StrReader r("s1\ns2\ns3\ns4\ns5\ns6\ns7");
+    bufio::Reader b(&r, 1024);
+
+    const char *samples[] = {
+        "s1", "s2", "s3", "s4", "s5", "s6", "s7"
+    };
+    int i = 0;
+    bufio::Buf line;
+    while (b.readline(&line) != bufio::_EOF) {
+        ASSERT_EQ(std::string(line.buf, line.len), samples[i++]);
+    }
+    ASSERT_EQ(i, sizeof(samples)/sizeof(char*));
+}
+
+
 TEST(IOUtilsTests, StrWriter) {
     io::StrWriter writer;
     const char *samples[] = {
