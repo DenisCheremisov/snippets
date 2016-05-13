@@ -21,14 +21,22 @@ namespace main {
         uint64_t capacity;
         uint64_t cur;
 
+        uint64_t loop_counter;
+        uint64_t flush_barrier;
+
         std::vector<LineReader*> readers;
 
     public:
-        Visitor(io::Writer *w, uint64_t cap=512*1024) {
+        // w    is a destination writer
+        // cap  initial buffer capacity = 512Kb
+        // fbar limits amount of readers to call in a row to force flush
+        //      stored data after. 0 is to avoid force flush.
+        Visitor(io::Writer *w, uint64_t cap=512*1024, fbar=0) {
             writer = w;
             capacity = cap;
             buf = new char[capacity];
             cur = 0;
+            flush_barrier = fbar;
         }
         ~Visitor() {
             delete [] buf;
@@ -56,8 +64,11 @@ namespace main {
         }
 
         void flush() {
-            writer->write(buf, cur);
-            cur = 0;
+            loop_counter = 0;
+            if (cur > 0) {
+                writer->write(buf, cur);
+                cur = 0;
+            }
         }
 
         int visit_all(time_t stamp) {
@@ -67,6 +78,9 @@ namespace main {
             }
             for(int i = 0; i < readers.size();) {
                 int res = readers[i]->get_lines(this, stamp);
+                if (flush_barrier > 0 && ++loop_counter >= flush_barrier) {
+                    flush();
+                }
                 if (res < 0) {
                     readers.erase(readers.begin() + i);
                 } else {
