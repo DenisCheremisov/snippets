@@ -9,6 +9,7 @@
 #include <ioutils/bufio.hh>
 #include <controller.hh>
 #include <scanner.hh>
+#include <filters.h>
 
 #include <iostream>
 
@@ -205,7 +206,7 @@ public:
     ReaderFactory(io::Reader *r, main::Filter *f) {
         rawReader = std::shared_ptr<io::Reader>(r);
         reader = std::shared_ptr<bufio::Reader>(
-            new bufio::Reader(r, 512*1024));
+            new bufio::Reader(rawReader.get(), 512*1024));
         meta = std::shared_ptr<logtools::LogMeta>(
             new DummyOddSkipper());
         scanner = std::shared_ptr<main::LogScanner>(
@@ -218,7 +219,6 @@ public:
             new main::FilteringLineReader(scanner.get(), filter.get()));
     }
 };
-
 
 
 TEST(MainTests, FilteringLineReaderTest) {
@@ -251,3 +251,37 @@ TEST(MainTests, FilteringLineReaderTest) {
     visitor.flush();
     ASSERT_EQ(writer.buf, "f1\nf2\ns3\ns4\nf5\nf6\ns7\n");
 }
+
+
+TEST(MainTests, FixedFilteringTest) {
+
+    ReaderFactory f1(new io::StrReader("f1\nf2\nf3\nf4\nf5\nf6\nf7"),
+                     new main::FixedFilter("f"));
+    ReaderFactory f2(new io::StrReader("s1\ns2\ns3\ns4\ns5\ns6\ns7"),
+                     new main::FixedFilter("4"));
+    auto r1 = f1.get();
+    auto r2 = f2.get();
+
+    io::StrWriter writer;
+    main::Visitor visitor(&writer, 1024);
+
+    visitor.add_reader(r1.get());
+    visitor.add_reader(r2.get());
+
+    ASSERT_EQ(visitor.visit_all(0), 2);
+    visitor.flush();
+    ASSERT_EQ(writer.buf, "f1\nf2\n");
+
+    ASSERT_EQ(visitor.visit_all(1), 2);
+    visitor.flush();
+    ASSERT_EQ(writer.buf, "f1\nf2\nf3\nf4\ns3\ns4\n");
+
+    ASSERT_EQ(visitor.visit_all(2), 2);
+    visitor.flush();
+    ASSERT_EQ(writer.buf, "f1\nf2\nf3\nf4\ns3\ns4\nf5\nf6\n");
+
+    ASSERT_EQ(visitor.visit_all(3), 0);
+    visitor.flush();
+    ASSERT_EQ(writer.buf, "f1\nf2\nf3\nf4\ns3\ns4\nf5\nf6\nf7\n");
+}
+
