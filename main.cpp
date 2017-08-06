@@ -1,7 +1,13 @@
 #include <iostream>
+#include <list>
+#include <cstring>
+
 #include <fcntl.h>
 #include <unistd.h>
-#include <cstring>
+
+#include <google/dense_hash_map>
+#include <boost/program_options.hpp>
+
 
 class Line {
     const char *buf;
@@ -19,6 +25,92 @@ public:
 
     inline const char *data() const {
         return buf;
+    }
+
+    void rebuild(const char *data, int lenght) {
+        buf = data;
+        end = data + lenght;
+    }
+
+    void rebuild(const char *data, const char *dataEnd) {
+        buf = data;
+        end = dataEnd;
+    }
+
+    bool operator==(const Line &another) const {
+        return len() == another.len() && memcmp(buf, another.buf, len()) == 0;
+    }
+
+    size_t hash() const {
+        unsigned int hash = 1315423911;
+        for (int i = 0; i < len(); i++) {
+            hash ^= ((hash << 5) + buf[i] + (hash >> 2));
+        }
+        return (hash & 0x7FFFFFFF);
+    }
+
+    std::string toString() const {
+        if (buf == nullptr) {
+            return "<empty>";
+        }
+        return std::string(buf, len());
+    }
+};
+
+struct lineEquator {
+    bool operator()(const Line &line1, const Line &line2) const {
+        return line1 == line2;
+    }
+};
+
+namespace std {
+    template<>
+    struct hash<Line> {
+        std::size_t operator()(const Line &k) const {
+            return k.hash();
+        }
+    };
+}
+
+class LinePool {
+    char *storage;
+    int cap;
+    int taken;
+
+    std::list<const char*> chunks;
+
+    char *allocateChunk(int capacity) {
+        return new char[capacity];
+    }
+
+    int left() {
+        return cap - taken;
+    }
+
+public:
+    LinePool(int initCapacity) {
+        storage = allocateChunk(initCapacity);
+        cap = initCapacity;
+        taken = 0;
+    }
+
+    ~LinePool() {
+        delete []storage;
+        for(auto it: chunks) {
+            delete []it;
+        }
+    }
+
+    void solid_alloc(Line &line) {
+        if (line.len() > left()) {
+            chunks.push_back(storage);
+            cap = std::max(2 * cap, 2 * line.len());
+            taken = 0;
+            storage = allocateChunk(cap);
+        }
+        memcpy(storage + taken, line.data(), line.len());
+        line.rebuild(storage + taken, line.len());
+        taken += line.len();
     }
 };
 
@@ -97,29 +189,86 @@ public:
 };
 
 
+class TSVScanner {
+    Line orig;
+    const char *dataStart;
+    const char *dataEnd;
+
+    int cols;
+
+    int curCol;
+
+public:
+    TSVScanner(int colLimit): cols(colLimit) {}
+
+    void set_source(const Line &src) {
+        orig = src;
+        dataStart = src.data();
+        dataEnd = src.data() + src.len();
+        curCol = 1;
+    }
+
+    // get_column returns bool if diff_index points to the columns that is out of bound set
+    // and throws MalformedLine exception if the line doesn't have enough columns
+    bool get_column(int index, Line &dest) throw(MalformedLine) {
+        if (index >= cols) {
+            return false;
+        }
+
+        for(int i = curCol; i < index; i++) {
+            const char *pos = reinterpret_cast<const char*>(memchr(dataStart, '\t', dataEnd - dataStart));
+            if (pos == nullptr) {
+                throw MalformedLine(std::string(orig.data(), orig.len()), "not enough columns");
+            }
+            dataStart = pos + 1;
+            curCol++;
+        }
+
+        curCol = index;
+        if (curCol == cols) {
+            dest.rebuild(dataStart, dataEnd);
+            dataStart = dataEnd;
+            return true;
+        }
+
+        const char *end = reinterpret_cast<const char*>(memchr(dataStart, '\t', dataEnd - dataStart));
+        if (end == nullptr) {
+            throw MalformedLine(std::string(orig.data(), orig.len()), "not enough columns");
+        }
+        dest.rebuild(dataStart, end);
+        dataStart = end + 1;
+        return true;
+    }
+};
+
+
 int Atoi(const char *nptr, const char *until) {
-    int i = 0;
     int res = 0;
     for (int i = 0; nptr + i < until; i++) {
-        res = res*10 + nptr[i] - '0';
+        res = res * 10 + nptr[i] - '0';
     }
     return res;
 }
 
+int Atoi(const Line &src) {
+    return Atoi(src.data(), src.data() + src.len());
+}
 
-void process(Reader<BUFSIZE> &src) throw(MalformedLine) {
+
+
+std::pair<std::string, int> process(
+        Reader<BUFSIZE> &src, int keyIndex, int valIndex, int colLimit) throw(MalformedLine) {
+
     Line dst;
 
-    const int CAPACITY = 2009;
-    int data[CAPACITY];
     int status;
-    for(int i = 0; i < sizeof(data)/sizeof(int); i++) {
-        data[i] = 0;
-    }
-    const char *col2start, *col2end, *col3start, *col3end;
-    int restLen;
-    int k, v;
-    std::string reason;
+    int v;
+    TSVScanner scanner(colLimit);
+    Line tmp1, tmp2, key;
+    int indices[2]{std::min(keyIndex, valIndex), std::max(keyIndex, valIndex)};
+    LinePool pool(512*1024); // 512Kb
+    google::dense_hash_map<Line, int, std::hash<Line>, lineEquator> storage;
+    storage.set_empty_key(Line());
 
     while (true) {
         status = src.getline(dst);
@@ -131,52 +280,93 @@ void process(Reader<BUFSIZE> &src) throw(MalformedLine) {
             break;
         }
 
-        col2start = reinterpret_cast<const char*>(memchr(dst.data(), '\t', dst.len()));
-        if (col2start == nullptr) {
-            throw MalformedLine(std::string(dst.data(), dst.len()));
-        }
-        col2start = col2start + 1;
-        restLen = dst.len() - (col2start - dst.data());
+        scanner.set_source(dst);
+        scanner.get_column(indices[0], tmp1);
+        scanner.get_column(indices[1] - indices[0], tmp2);
+        if (keyIndex > valIndex) {
 
-        col2end = reinterpret_cast<const char*>(memchr(col2start, '\t', restLen));
-        if (col2end == nullptr) {
-            throw MalformedLine(std::string(dst.data(), dst.len()));
         }
-        col3start = col2end + 1;
-        restLen = dst.len() - (col3start - dst.data());
-
-        col3end = reinterpret_cast<const char*>(memchr(col3start, '\t', restLen));
-        if (col3end == nullptr) {
-            throw MalformedLine(std::string(dst.data(), dst.len()));
+        if (keyIndex < valIndex) {
+            key = tmp1;
+            v = Atoi(tmp2);
+        } else {
+            key = tmp2;
+            v = Atoi(tmp1);
         }
-        k = Atoi(col2start, col2end);
-        v = Atoi(col3start, col3end);
-        if (k >= CAPACITY) {
-            throw MalformedLine(std::string(dst.data(), dst.len()), "2nd column value is out of range");
+        auto keyPos = storage.find(key);
+        if (keyPos != storage.end()) {
+            keyPos.pos->second += v;
+        } else {
+            pool.solid_alloc(key);
+            storage[key] = v;
         }
-        data[k] += v;
     }
 
-    k = -1;
     v = 0;
-    for(int i = 0; i < sizeof(data)/sizeof(int); i++) {
-        if (data[i] > v) {
-            k = i;
-            v = data[i];
+    key = Line();
+    for (auto it: storage) {
+        if (it.second > v) {
+            key = it.first;
+            v = it.second;
         }
     }
-    std::cout << "Max key: " << k << ", max value: " << v << std::endl;
+    return std::pair<std::string, int>(key.toString(), v);
 }
 
-int main(int argc, char **argv) {
-    int rawSrc = open(argv[1], O_RDONLY);
+namespace po = boost::program_options;
+
+
+void printUsage(const char **argv, const po::options_description &desc) {
+    std::cerr << "Usage: " << argv[0] << " [options] <input file name>" << std::endl;
+    std::cerr << desc << std::endl;
+}
+
+int main(int argc, const char **argv) {
+    int keyIndex, valIndex, colLimit;
+    po::options_description desc("Options");
+    desc.add_options()
+            ("help", "produce help message")
+            ("key", po::value<int>(&keyIndex)->default_value(2), "key column index (1, 2, 3, ...)")
+            ("val", po::value<int>(&valIndex)->default_value(3), "value column index (1, 2, 3, ...)")
+            ("limit", po::value<int>(&colLimit)->default_value(4), "how many columns to scan");
+    po::options_description hidden("Hidden options");
+    hidden.add_options()("input-file", po::value<std::string>(), "input file");
+    po::options_description cmdlineOptions;
+    cmdlineOptions.add(desc).add(hidden);
+
+    po::positional_options_description p;
+    p.add("input-file", -1);
+
+    po::variables_map pm;
+    try {
+        po::store(po::command_line_parser(argc, argv).options(cmdlineOptions).positional(p).run(), pm);
+        po::notify(pm);
+    } catch(const std::exception &exc) {
+        printUsage(argv, desc);
+        std::cerr << "\033[31m" << exc.what() << "\033[0m\n";
+        return 1;
+    }
+
+    if (pm.count("help")) {
+        printUsage(argv, desc);
+        return 0;
+    }
+
+    int fileIndex = pm.count("input-file");
+    if (!fileIndex) {
+        printUsage(argv, desc);
+        std::cerr << "\033[31mmissing input file name positional parameter\033[0m\n";
+        return 1;
+    }
+    int rawSrc = open(argv[fileIndex], O_RDONLY);
     if (rawSrc < 0) {
         perror("Error");
     }
 
     Reader<BUFSIZE> src(rawSrc);
     try {
-        process(src);
+        auto res = process(src, keyIndex, valIndex, colLimit);
+        std::cout << "Max key: " << res.first << ", max value: " << res.second << std::endl;
     } catch (const MalformedLine &exc) {
         std::cerr << exc.what() << std::endl;
         return 1;
