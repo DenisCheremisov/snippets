@@ -218,13 +218,12 @@ public:
         for(int i = curCol; i < index; i++) {
             const char *pos = reinterpret_cast<const char*>(memchr(dataStart, '\t', dataEnd - dataStart));
             if (pos == nullptr) {
-                throw MalformedLine(std::string(orig.data(), orig.len()), "not enough columns");
+                throw MalformedLine(orig.toString(), "not enough columns");
             }
             dataStart = pos + 1;
-            curCol++;
         }
 
-        curCol = index;
+	curCol = index;
         if (curCol == cols) {
             dest.rebuild(dataStart, dataEnd);
             dataStart = dataEnd;
@@ -233,10 +232,11 @@ public:
 
         const char *end = reinterpret_cast<const char*>(memchr(dataStart, '\t', dataEnd - dataStart));
         if (end == nullptr) {
-            throw MalformedLine(std::string(orig.data(), orig.len()), "not enough columns");
+            throw MalformedLine(orig.toString(), "not enough columns");
         }
         dest.rebuild(dataStart, end);
         dataStart = end + 1;
+        curCol++;
         return true;
     }
 };
@@ -282,7 +282,7 @@ std::pair<std::string, int> process(
 
         scanner.set_source(dst);
         scanner.get_column(indices[0], tmp1);
-        scanner.get_column(indices[1] - indices[0], tmp2);
+        scanner.get_column(indices[1], tmp2);
         if (keyIndex < valIndex) {
             key = tmp1;
             v = Atoi(tmp2);
@@ -290,6 +290,7 @@ std::pair<std::string, int> process(
             key = tmp2;
             v = Atoi(tmp1);
         }
+
         auto keyPos = storage.find(key);
         if (keyPos != storage.end()) {
             keyPos.pos->second += v;
