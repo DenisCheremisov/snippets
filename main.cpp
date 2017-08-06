@@ -283,9 +283,6 @@ std::pair<std::string, int> process(
         scanner.set_source(dst);
         scanner.get_column(indices[0], tmp1);
         scanner.get_column(indices[1] - indices[0], tmp2);
-        if (keyIndex > valIndex) {
-
-        }
         if (keyIndex < valIndex) {
             key = tmp1;
             v = Atoi(tmp2);
