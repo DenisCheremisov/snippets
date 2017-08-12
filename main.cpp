@@ -300,6 +300,9 @@ std::pair<std::string, int> process(
         }
     }
 
+    if (storage.size() == 0) {
+        return std::pair<std::string, int>("", 0);
+    }
     v = 0;
     key = Line();
     for (auto it: storage) {
