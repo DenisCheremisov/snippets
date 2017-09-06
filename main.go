@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -31,40 +30,24 @@ func NewTSVScanner(colLimit int) *TSVScanner {
 func (s *TSVScanner) SetSource(line []byte) {
 	s.orig = line
 	s.rest = line
-	s.curCol = 1
 }
 
-// GetChunk ...
-func (s *TSVScanner) GetChunk(index int) (chunk []byte, err error) {
-	if index > s.cols {
-		err = fmt.Errorf("Column index (%d) is out of bounds in `%s`", index, string(s.orig))
-		return
-	}
-
-	for i := s.curCol; i < index; i++ {
-		pos := bytes.IndexByte(s.rest, '\t')
-		if pos < 0 {
-			err = fmt.Errorf("Malformed line `%s`: not enough columns", string(s.orig))
-			return
+// GetField ...
+func (s *TSVScanner) GetField() (field []byte, err error) {
+	pos := -1
+	for i, char := range s.rest {
+		if char == '\t' {
+			pos = i
+			break
 		}
-		s.rest = s.rest[pos+1:]
 	}
-
-	s.curCol = index
-	if s.curCol == s.cols {
-		chunk = s.rest
-		s.rest = s.rest[len(s.rest):]
-		return
-	}
-
-	pos := bytes.IndexByte(s.rest, '\t')
 	if pos < 0 {
 		err = fmt.Errorf("Malformed line `%s`: not enough columns", string(s.orig))
 		return
 	}
-	chunk = s.rest[:pos]
+	field = s.rest[:pos]
 	s.rest = s.rest[pos+1:]
-	s.curCol++
+
 	return
 }
 
@@ -98,11 +81,25 @@ func Process(r io.Reader, keyIndex, valIndex, colLimit int) (key string, val int
 	for scanner.Scan() {
 		s.SetSource(scanner.Bytes())
 
-		t1, err = s.GetChunk(indices[0])
+		for i := 1; i < indices[0]; i++ {
+			_, err = s.GetField()
+			if err != nil {
+				return
+			}
+		}
+
+		t1, err = s.GetField()
 		if err != nil {
 			return
 		}
-		t2, err = s.GetChunk(indices[1])
+
+		for i := indices[0] + 1; i < indices[1]; i++ {
+			_, err = s.GetField()
+			if err != nil {
+				return
+			}
+		}
+		t2, err = s.GetField()
 		if err != nil {
 			return
 		}
