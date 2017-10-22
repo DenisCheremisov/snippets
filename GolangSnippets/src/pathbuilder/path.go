@@ -2,14 +2,16 @@ package pathbuilder
 
 import "fmt"
 
-// Path representing protobuf node path
+// Path represents protobuf's node path which is defined in
+// https://github.com/google/protobuf/blob/b189389e2f2ca01dd534a8e9ba3ac38ea45cdba6/src/google/protobuf/descriptor.proto#L718
 type Path []int32
 
 func oveflow(v interface{}) {
 	panic(fmt.Errorf("value %d (%T) is out of range for int32", v, v))
 }
 
-// Append appends elements to the path
+// Append creates a New path consisting of all current Path elements with `data` appended
+// All data elements must be either of int or uint types. Every other type causes panicking.
 func (p Path) Append(data ...interface{}) (result Path) {
 	res := make([]int32, len(p)+len(data))
 	copy(res, []int32(p))
@@ -59,19 +61,25 @@ func (p Path) Append(data ...interface{}) (result Path) {
 			}
 			val = int32(v)
 		default:
-			panic(fmt.Errorf("unsupported type %T", value))
+			panic(fmt.Errorf("value of type %T cannot be appended, only integer types are supported", value))
 		}
 		res[i+len(p)] = val
 	}
 	return
 }
 
-// Cut cuts last offset elements from the path's tail
-func (p Path) Cut(offset int) Path {
-	if offset > len(p) {
-		panic(fmt.Errorf("try to cut more elements from the path than it has (%d > %d)", offset, len(p)))
+// Cut copies all but last `n` elements from current Path into the new Path and returns it
+func (p Path) Cut(n int) Path {
+	if n > len(p) {
+		panic(
+			fmt.Errorf(
+				"attempt to cut out more elements from the path than it actually has (%d > %d)",
+				n,
+				len(p),
+			),
+		)
 	}
-	res := make([]int32, len(p)-offset)
-	copy(res, p[:len(p)-offset])
+	res := make([]int32, len(p)-n)
+	copy(res, p[:len(p)-n])
 	return Path(res)
 }
