@@ -10,7 +10,8 @@ func oveflow(v interface{}) {
 	panic(fmt.Errorf("value %d (%T) is out of range for int32", v, v))
 }
 
-// Append creates a New path consisting of all current Path elements with `data` appended
+// Append creates a New path consisting of all current Path elements with `data` appended and returns it
+// ([a₁,a₂,…,aₙ],[b₁,b₂,…,bₘ]) → [a₁,a₂,…,aₙ,b₁,b₂,…,bₘ]
 // All data elements must be either of int or uint types. Every other type causes panicking.
 func (p Path) Append(data ...interface{}) (result Path) {
 	res := make([]int32, len(p)+len(data))
